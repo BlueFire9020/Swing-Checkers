@@ -40,21 +40,30 @@ public class CheckersGame
 	}
 	public void playMove()
 	{
+		//TODO: add algorithm to the computer (make it so it makes all hops first, then moves sequentially?)
 		//computer is playing, since we don't have an algorithm just play randomly.
+		//TODO: Determine number of pieces killed for each hop and make computer difficulties accordingly
 		ArrayList<Point> possibleMoves = new ArrayList<Point>();
 		ArrayList<Point> pawns = getPointsForTeam(1);
-
-		while (possibleMoves.size() < 1 && pawns.size() > 1)
+		
+		for (Point point : pawns)
 		{
-			Point moveTarget = pawns.get((int)(Math.random() * pawns.size()));
-
-			possibleMoves = getPossibleMoves(moveTarget);
-			System.out.println(possibleMoves.size());
-			if (possibleMoves.size() > 1)
+			//check if any kill moves exist, and play those first
+			ArrayList<Point> possibleHops = getPossibleHops(point);
+			if (possibleHops.size() > 0)
+			{
+				playMove(point, possibleHops.get(0));
+				return;
+			}
+		}
+		for (Point point : pawns)
+		{
+			possibleMoves = getPossibleMoves(point);
+			if (possibleMoves.size() > 0)
 			{
 				Point move = possibleMoves.get((int)(Math.random() * possibleMoves.size()));
-				System.out.println(moveTarget + " -> " + move);
-				playMove(moveTarget, move);	
+				playMove(point, move);	
+				return;
 			}
 		}
 
@@ -62,105 +71,61 @@ public class CheckersGame
 
 	public void playMove(Point origin, Point target)
 	{
-		//check if position is odd tile
-		//if the row is odd, the column must be even
-		//if the row is even, the column must be odd
+		/*System.out.println("MOVING " + turns);
+		System.out.println("PIECE FOR TEAM " + board.get(origin).getTeam());
+		System.out.println("TRANSFER FROM x" + origin.x + " y" + origin.y + " TO x" + target.x + " y" + target.y);
+		System.out.println("---------------");*/
 		boolean rowEven = (target.y % 2) == 0;
 		boolean columnEven = (target.x % 2) == 0;
+		boolean justCrowned = false;
 
 		Pawn targetPawn = board.get(origin);
-
-		System.out.println("turns 1 " + turns);
-		System.out.println("turns " + Math.min(turns % 2, 1));
 		//ensure that we're moving a pawn on our team, and that the pawn exists
 		if (targetPawn != null && targetPawn.getTeam() == Math.min(turns % 2, 1))
 		{
-			//if it's an odd tile, we can play
-			if (rowEven && !columnEven || !rowEven && columnEven && target.x < boardSize && target.y < boardSize)
+			ArrayList<Point> moves = getPossibleMoves(origin);
+			//ensure that the movement distance is exactly correct
+			int distance = (int)(Math.pow(target.x - origin.x, 2) + Math.pow(target.y - origin.y, 2));
+			
+			if (moves.contains(target))
 			{
-				//ensure that the movement distance is exactly correct
-				int distance = (int)(Math.pow(target.x - origin.x, 2) + Math.pow(target.y - origin.y, 2));
-
-
-				Point midpoint = null;
-				if (target.y - origin.y < 0 && turns % 2 == 0 || target.y - origin.y > 0 && turns % 2 == 1 || targetPawn.isKing())
+				if (target.y == boardSize * Math.min(turns % 2, 1))
 				{
-					if (distance == 8)
-					{
-						midpoint = new Point((target.x + origin.x) / 2, (target.y + origin.y) / 2);	
-					}
-					else if (distance == 2)
-					{
-						midpoint = target;
-					}	
+					targetPawn.king();
+					justCrowned = true;
 				}
-
-
-				//check if there's a piece under the hop and that the piece is enemy
-				if (midpoint != null)
+				movePawn(origin, target);
+				if (distance == 8)
 				{
-					if (board.containsKey(midpoint) && board.get(midpoint).getTeam() != Math.min(turns % 2, 1))
+					Point midpoint = new Point((target.x + origin.x) / 2, (target.y + origin.y) / 2);	
+					board.remove(midpoint);
+					ArrayList<Point> possibleHops = getPossibleHops(target);
+					//TODO: Improve logic so that it chooses the hop path with the most possible kills
+					if (possibleHops.size() > 0 && !justCrowned)
 					{
-						//kill the pawn there
-						board.remove(midpoint);
-
-						targetPawn = board.remove(origin);
-						board.put(target, targetPawn);
-						selectPawn(target);
-						/*now, we must check surrounding tiles to see if any consecutives may be played
-						 * before we end our turn
-						 */
-						Point topRight = new Point(target.x + 1, target.y - 1);
-						Point topLeft = new Point(target.x - 1, target.y - 1);
-						Point botRight = new Point(target.x + 1, target.y + 1);
-						Point botLeft = new Point(target.x - 1, target.y + 1);
-
-						if (board.containsKey(topRight) && !board.containsKey(new Point(target.x + 2, target.y - 2)))
-						{
-							playMove(target, new Point(target.x + 2, target.y - 2));
-						}
-						if (board.containsKey(topLeft) && !board.containsKey(new Point(target.x - 2, target.y - 2)))
-						{
-							playMove(target, new Point(target.x - 2, target.y - 2));
-						}
-
-						//Only allowed to move backwards if king
-						if (targetPawn.isKing())
-						{
-							if (board.containsKey(botRight) && !board.containsKey(new Point(target.x + 2, target.y + 2)))
-							{
-								playMove(target, new Point(target.x + 2, target.y + 2));
-							}
-							if (board.containsKey(botLeft) && !board.containsKey(new Point(target.x - 2, target.y + 2)))
-							{
-								playMove(target, new Point(target.x - 2, target.y + 2));
-							}	
-						}
-
-						if (midpoint.y == boardSize * Math.min(turns % 2, 1))
-						{
-							targetPawn.king();
-						}
-
-						turns++;
+						playMove(target, possibleHops.get(0));
+						return;
 					}
-					else if (!board.containsKey(midpoint))
+					else
 					{
-						//perform a standard move, to assist computer algorithms
-						targetPawn = board.remove(origin);
-						board.put(midpoint, targetPawn);
-						selectPawn(midpoint);
-						if (midpoint.y == boardSize * Math.min(turns % 2, 1))
-						{
-							targetPawn.king();
-						}
-
 						turns++;
+						return;
 					}
 				}
+				if (Math.min(turns % 2, 1) == 0)					
+				{
+					selectPawn(target);	
+				}
+				if (selectedPawn == target)
+				{
+					deselectPawn();
+				}
+				turns++;
 			}
 		}
 	}
+	
+	
 	public ArrayList<Point> getPossibleSelectedMoves()
 	{
 		return getPossibleMoves(selectedPawn);
@@ -171,50 +136,62 @@ public class CheckersGame
 		ArrayList<Point> moves = new ArrayList<Point>();
 		if (target != null && board.get(target) != null)
 		{
-			Point topRight = new Point(target.x + 1, target.y - 1);
-			Point topLeft = new Point(target.x - 1, target.y - 1);
-			Point botRight = new Point(target.x + 1, target.y + 1);
-			Point botLeft = new Point(target.x - 1, target.y + 1);
 
-			if (Math.min(turns % 2, 1) == 0 && !board.get(target).isKing())
+			for (int x = -1; x < 2; x += 2)
 			{
-				if (!board.containsKey(topRight))
+				for (int y = -1; y < 2; y += 2)
 				{
-					moves.add(topRight);
-				}
-				else if (!board.containsKey(new Point(target.x + 2, target.y - 2)) && board.get(topRight).getTeam() != Math.min(turns % 2, 1))
-				{
-					moves.add(new Point(target.x + 2, target.y - 2));
-				}
-				if (!board.containsKey(topLeft))
-				{
-					moves.add(topLeft);
-				}
-				else if (!board.containsKey(new Point(target.x - 2, target.y - 2)) && board.get(topLeft).getTeam() != Math.min(turns % 2, 1))
-				{
-					moves.add(new Point(target.x - 2, target.y - 2));
+					if (Math.min(turns % 2, 1) >= y || board.get(target).isKing())
+					{
+						Point midpoint = new Point(target.x + x, target.y + y);
+						Point hop = new Point(target.x + (x * 2), target.y + (y * 2));
+						if (board.containsKey(midpoint) && board.get(midpoint).getTeam() != Math.min(turns % 2, 1))
+						{
+							if (!board.containsKey(hop) && insideBoard(hop))
+							{
+								moves.add(hop);
+							}
+						}
+						else if (!board.containsKey(midpoint) && insideBoard(midpoint))
+						{
+							moves.add(midpoint);
+						}		
+					}
 				}
 			}
-			//Only allowed to move backwards if king
-			else if (board.get(target).isKing() || Math.min(turns % 2, 1) == 1)
-			{
 
-				if (!board.containsKey(botRight))
+		}
+		return moves;
+	}
+	
+	public ArrayList<Point> getPossibleHops(Point target)
+	{
+		ArrayList<Point> moves = new ArrayList<Point>();
+		if (target != null && board.get(target) != null)
+		{
+
+			for (int x = -1; x < 2; x += 2)
+			{
+				for (int y = -1; y < 2; y += 2)
 				{
-					moves.add(botRight);
+					if (Math.min(turns % 2, 1) == Math.min(y, 0) + 1 || board.get(target).isKing())
+					{
+						Point midpoint = new Point(target.x + x, target.y + y);
+						Point hop = new Point(target.x + (x * 2), target.y + (y * 2));
+						if (board.containsKey(midpoint) && board.get(midpoint).getTeam() != Math.min(turns % 2, 1))
+						{
+							if (!board.containsKey(hop) && insideBoard(hop))
+							{
+								System.out.println("NEW HOP");
+								System.out.println("og" + target.x + " " + target.y);
+								System.out.println(hop.x + " " + hop.y);
+								System.out.println("x" + x + " y" + y);
+								System.out.println(Math.min(turns % 2, 1) + " vs y" + Math.min(y, 0) + 1);
+								moves.add(hop);
+							}
+						}
+					}
 				}
-				else if (!board.containsKey(new Point(target.x + 2, target.y + 2)) && board.get(botRight).getTeam() != Math.min(turns % 2, 1))
-				{
-					moves.add(new Point(target.x + 2, target.y + 2));
-				}
-				if (!board.containsKey(botLeft))
-				{
-					moves.add(botLeft);
-				}
-				else if (!board.containsKey(new Point(target.x - 2, target.y + 2)) && board.get(botLeft).getTeam() != Math.min(turns % 2, 1))
-				{
-					moves.add(new Point(target.x - 2, target.y + 2));
-				}	
 			}
 
 		}
@@ -253,6 +230,17 @@ public class CheckersGame
 	{
 		return selectedPawn;
 	}
+	
+
+	public void deselectPawn()
+	{
+		selectedPawn = null;
+	}
+	
+	public Pawn addPawn(Point tile, boolean player)
+	{
+		return board.put(tile, new Pawn(player));
+	}
 
 	public Pawn getPawn(Point tile)
 	{
@@ -264,10 +252,17 @@ public class CheckersGame
 
 		return null;
 	}
-
-	public void deselectPawn()
+	
+	public Pawn movePawn(Point origin, Point target)
 	{
-		selectedPawn = null;
+		Pawn targetPawn = board.remove(origin);
+		board.put(target, targetPawn);
+		return targetPawn;
+	}
+	
+	public Pawn removePawn(Point tile)
+	{
+		return board.remove(tile);
 	}
 
 	public ArrayList<Point> getPawnTiles()
@@ -283,6 +278,19 @@ public class CheckersGame
 	public int getTurns()
 	{
 		return turns;
+	}
+	
+	private boolean insideBoard(Point p)
+	{
+		if (p.x < boardSize && p.y < boardSize)
+		{
+			if (p.x >= 0 && p.y >= 0)
+			{
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	public String toString()
