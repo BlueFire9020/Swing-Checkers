@@ -1,8 +1,7 @@
 
-public class Pawn 
+public class Pawn extends Piece
 {	
 	private boolean crowned;
-	private int team;
 	
 	public Pawn()
 	{
@@ -11,18 +10,13 @@ public class Pawn
 	
 	public Pawn(boolean playerPawn)
 	{
-		this();
-		this.team = playerPawn == false ? 1 : 0;
+		super(playerPawn == false ? 1 : 0);
+		crowned = false;
 	}
 	
 	public boolean isPlayerPawn()
 	{
-		return team == 1 ? false : true;
-	}
-	
-	public int getTeam()
-	{
-		return team;
+		return super.getTeam() == 1 ? false : true;
 	}
 	
 	public void king()
