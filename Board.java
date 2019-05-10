@@ -34,9 +34,9 @@ public abstract class Board
 		return turns;
 	}
 	
-	public void setTurn(int value)
+	public void setTurns(int value)
 	{
-		turns += Math.max(0, turns);
+		turns = Math.max(0, turns + value);
 	}
 	
 	public void passTurn()
